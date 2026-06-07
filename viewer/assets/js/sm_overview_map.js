@@ -13,6 +13,10 @@ SMOverviewMap = (function() {
     var minZoom = 0
     var maxZoom = 5
     var gridSize = 64
+    // Below this zoom, cells render as flat type colors only (no tile images),
+    // keeping the fully-zoomed-out whole-map view responsive. Tune as desired
+    // (set to 0 to always render images; set higher for a snappier overview).
+    var MIN_ZOOM_FOR_IMAGES = 0.5
 
     // A quick extension to allow image layer rotation.
     L.RotateImageLayer = L.ImageOverlay.extend({
@@ -101,6 +105,7 @@ SMOverviewMap = (function() {
                 cells[cell.x] = {};
             }
             cells[cell.x][cell.y] = cell;
+            cell.imgUrl = getTileURL(cell.tileid, cell.x, cell.y);
             if(cell.poiType) {
                 poiCoords.push([cell.x,cell.y]);
             }
@@ -261,26 +266,23 @@ SMOverviewMap = (function() {
                     // div.innerHTML += "<div class='rotLabel'>R:"+cell.rotation+"</div>"
                     // div.innerHTML += "<div class='tileid'>"+cell.tileid+"</div>"
 
-                    var turl = getTileURL(cell.tileid,cell.x,cell.y);
-                    if(!turl) {
-                        if(cell.type != "LAKE" && POI_SIZES[cell.poiType] == undefined) {
-                            console.log(`Missing tile at ${x},${y*-1} for id ${cell.tileid} ${cell.type}`)
-                        }
-                        if(cell.poiurlfound == true) {
-                            tile.classList.remove(cell.type.toLowerCase())
-                        }
+                    var turl = cell.imgUrl;
+                    if(!turl && cell.poiurlfound == true) {
+                        tile.classList.remove(cell.type.toLowerCase())
                     }
-                    if(turl) {
+                    if(turl && map.getZoom() >= MIN_ZOOM_FOR_IMAGES) {
                         tile.classList.remove(cell.type.toLowerCase())
                         var img = document.createElement('img');
                         img.src = turl
+                        img.loading = 'lazy';
+                        img.decoding = 'async';
                         img.classList.add('tileimg')
                         inner.appendChild(img);
                         if(cell.rotation != 0) {
                             img.classList.add('rot-' + cell.rotation)
                         }
                     } else
-                    if(cell.roads.length > 0) {
+                    if(cell.roads && cell.roads.length > 0) {
                         var split = cell.roads.split('');
                         split.forEach((dir) => {
                             var road = document.createElement('div');
@@ -408,19 +410,19 @@ SMOverviewMap = (function() {
     function getPoiUrl(poiType,tileid,x,y) {
         switch(poiType) {
             case 'POI_MECHANICSTATION_MEDIUM':
-                return './assets/img/mechanic_station.png'
+                return './assets/img/mechanic_station.jpg'
             break;
             case 'POI_HIDEOUT_XL':
-                return './assets/img/hideout.png'
+                return './assets/img/hideout.jpg'
             break;
             case 'POI_CAMP_LARGE':
                 return './assets/img/camp_large.jpg'
             break;
             case 'POI_WAREHOUSE4_LARGE':
-                return './assets/img/warehouse4.png'
+                return './assets/img/warehouse4.jpg'
             break;
             case 'POI_WAREHOUSE3_LARGE':
-                return './assets/img/warehouse3_large.png'
+                return './assets/img/warehouse3_large.jpg'
             break;
             case 'POI_WAREHOUSE2_LARGE':
                 return './assets/img/warehouse2.jpg'
