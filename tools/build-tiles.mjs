@@ -17,7 +17,7 @@
  * Defaults: cells = viewer/public/data/cells.json, ppc = 256
  */
 import sharp from "sharp";
-import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from "fs";
+import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync, readdirSync } from "fs";
 import { dirname, join, resolve as pathResolve } from "path";
 import { fileURLToPath } from "url";
 
@@ -242,8 +242,14 @@ async function main(){
   console.log(`pyramid zoom levels 0..${maxZoom}`);
 
   // 5. generate tiles per zoom (downscale baseRaw, slice into 256px tiles)
-  rmSync(OUT_TILES, { recursive:true, force:true });
-  mkdirSync(OUT_TILES, { recursive:true });
+  // Clear the output dir's CHILDREN but keep the directory itself. Replacing the
+  // dir inode breaks a running Vite dev server's static middleware (it stops
+  // finding anything under /tiles/ and returns index.html — the SPA fallback).
+  if (existsSync(OUT_TILES)) {
+    for (const entry of readdirSync(OUT_TILES)) rmSync(join(OUT_TILES, entry), { recursive:true, force:true });
+  } else {
+    mkdirSync(OUT_TILES, { recursive:true });
+  }
   const TS = 256;
 
   for (let z = maxZoom; z >= 0; z--){
