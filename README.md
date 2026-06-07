@@ -1,120 +1,201 @@
 # Scrap Mechanic Overview
 
-Export your **Scrap Mechanic** Survival world into a fast, interactive, zoomable map — with markers you can place and keep.
+Turn your **Scrap Mechanic** Survival world into a fast, interactive, zoomable map — with persistent markers, cell inspection, and a full POI roster.
 
-This packages [**sm_overview**](https://github.com/the1killer/sm_overview) by **The1Killer** with a streamlined, **fully automated** workflow that works on game versions **0.6.6 and later** (including 0.7.x), and a **rewritten viewer** built on React + Leaflet.
+This is a modernized, automated fork of [**sm_overview**](https://github.com/the1killer/sm_overview) by **The1Killer**. It adds a **0.6.6+/0.7.x-compatible export** (the original is broken on newer game versions), a **pre-rendered tile pipeline** for instant pan/zoom, and a **React + Leaflet viewer** with markers.
 
-![overview architecture](https://img.shields.io/badge/viewer-React%20%2B%20Leaflet-61dafb) ![build](https://img.shields.io/badge/pre--render-Sharp%20tile%20pyramid-99cc00)
+```
+Scrap Mechanic v0.7.4  ·  Windows or Linux/Proton  ·  ~21k tiles  ·  instant pan/zoom
+```
 
 ---
 
-## Why this is fast
+## What you get
 
-The original viewer created **~16,000 DOM nodes** (one `<div>` per world cell, each with an image) and rebuilt them on every pan/zoom — slow, and blurry when zoomed out.
+- **Buttery-smooth map** — pan and zoom are instant at any zoom level, with full detail everywhere. No re-rendering on pan.
+- **Click any cell** — see its coordinates, terrain type, tile ID, rotation, and POI. Coordinates match the in-game `/cell` chat command.
+- **Persistent markers** — drop labeled, color-coded pins anywhere; they're saved in your browser and survive refreshes.
+- **POI browser** — every hideout, warehouse, mechanic station, silo district, camp, and more, listed and labeled on the map.
+- **Terrain breakdown** — live count of each biome type across your world.
 
-This viewer **pre-renders the entire map once into a `{z}/{x}/{y}` tile pyramid** (Sharp, server-side), then displays it with Leaflet's native `L.tileLayer`. That's GPU-composited, only paints the visible viewport, and shows **full detail at every zoom level**. Panning and zooming are instant, and you can place **persistent markers** (saved to `localStorage`).
+### Why this is fast
 
+The original viewer created **~16,000 DOM nodes** (one per world cell, each with its own image) and rebuilt them on every pan and zoom — sluggish, and blurry when zoomed out.
+
+This viewer **pre-renders the entire map once** into a standard `{z}/{x}/{y}` tile pyramid, then displays it with Leaflet's native `L.tileLayer`. That's GPU-composited, only paints what's on screen, and only downloads the few tiles in the viewport — so the 132 MB pyramid is never loaded wholesale.
+
+---
+
+## Quick start
+
+> Already patched and exported? Just run `bash tools/serve.sh` and open http://localhost:8080.
+
+```bash
+git clone https://github.com/BYTE-6D65/scrap-mechanic-overview
+cd scrap-mechanic-overview
 ```
-scrap-mechanic-overview/
-├── game-patches/
-│   ├── tile_database.lua      # replace game's (adds GetLegacyID lookup)
-│   └── export_block.lua       # snippet to paste into terrain_overworld.lua
-├── tools/
-│   ├── extract_cells.py       # game log  ->  viewer cells.json
-│   ├── build-tiles.mjs        # cells.json + img  ->  tile pyramid (Sharp)
-│   └── serve.sh               # install + build(if needed) + dev server
-├── viewer/                    # React + Vite + TS + Leaflet app
-│   ├── public/img/            # source tile + POI images
-│   └── src/…
-└── legacy/                    # the original vanilla viewer (reference)
-```
+
+1. **Patch the game** (two files, one-time) — see [Setup → Patch the game](#2-patch-the-game).
+2. **Export your world** — load your Survival save, quit, then:
+   ```bash
+   python3 tools/extract_cells.py
+   ```
+3. **Build + view** — this installs deps, renders the tile pyramid (1–2 min, once per world), and starts the dev server:
+   ```bash
+   bash tools/serve.sh
+   ```
+   Open **http://localhost:8080**.
 
 ---
 
 ## Requirements
 
-- Scrap Mechanic (Survival mode) on Steam — Windows, or Linux via Proton
-- [Bun](https://bun.sh) (runs the viewer + tile builder)
-- Python 3 (extraction only)
-- ~10 GB free RAM for the tile build (one-time, per world)
-- A web browser
+- Scrap Mechanic (Survival) on Steam — Windows, or Linux via Proton
+- [Bun](https://bun.sh) — runs the viewer and the tile builder
+- Python 3 — extraction only
+- ~10 GB free RAM for the one-time tile build
+- A modern browser
 
 ---
 
 ## Setup
 
-### 1. Back up your save (!!!)
+### 1. Back up your save (!!)
 
-You're editing game script files; back up first.
+You'll be editing game script files, so back up first.
 
 - **Windows:** `%localappdata%\Axolot Games\Scrap Mechanic\UserData\`
 - **Linux/Proton:** `…/steamapps/compatdata/387990/pfx/drive_c/users/steamuser/AppData/Local/Axolot Games/Scrap Mechanic/UserData/`
 
-Also back up the two game files in step 2.
+Also back up the two game files in step 2 (or use Steam's *Verify Integrity of Game Files* to restore them later).
 
-### 2. Patch the game files
+### 2. Patch the game
 
 Game script root:
 
 - **Windows:** `C:\Program Files (x86)\Steam\steamapps\common\Scrap Mechanic\Survival\Scripts\terrain\`
 - **Linux/Proton:** `~/.local/share/Steam/steamapps/common/Scrap Mechanic/Survival/Scripts/terrain/`
 
-**(a)** Replace `overworld/tile_database.lua` with [`game-patches/tile_database.lua`](game-patches/tile_database.lua) (adds the `GetLegacyID` lookup the exporter needs).
+**(a)** Replace `overworld/tile_database.lua` with [`game-patches/tile_database.lua`](game-patches/tile_database.lua).
+This adds a `GetLegacyID` lookup (by **Arkanorian**) that the exporter needs to resolve tile images.
 
-**(b)** In `terrain_overworld.lua`, find `Load()`. Inside the `if sm.terrainData.exists() then` block, paste [`game-patches/export_block.lua`](game-patches/export_block.lua) **immediately after** `CreateCellTileStorageKeys()` and **before** `return true`.
+**(b)** Open `terrain_overworld.lua`, find the `Load()` function. Inside the `if sm.terrainData.exists() then` block, paste the contents of [`game-patches/export_block.lua`](game-patches/export_block.lua) **immediately after** `CreateCellTileStorageKeys()` and **before** `return true`.
 
-The block runs once per session, is wrapped in `pcall()`, and logs any error — so it can't break your game's load. (Game updates wipe these patches; re-apply after updates, or verify game files to remove them.)
+The export block runs once per session, is wrapped in `pcall()`, and logs any error — so it can't break your game's load. **Game updates overwrite these files**, so re-apply after updates (or verify game files to remove the patches entirely).
 
 ### 3. Export your world
 
-Launch Scrap Mechanic, **load your Survival save**, let the world finish loading, then quit. The data is written to the newest game log once automatically. Then:
+Launch Scrap Mechanic, **load your Survival save**, let the world finish loading, then quit. The export block writes your cell data to the newest game log once, automatically. Then:
 
 ```bash
 python3 tools/extract_cells.py
-# -> writes viewer/public/data/cells.json  (your seed + all cells)
+# → writes viewer/public/data/cells.json (your seed + every cell)
 ```
 
-> Can't find the log? Pass it explicitly, or set `STEAM_COMMON`. On Linux/Proton logs live in `…/Scrap Mechanic/Logs/game-*.log`.
+> **Can't find the log?** Pass it explicitly, or set `STEAM_COMMON` to your `steamapps/common` path. Logs live at `…/Scrap Mechanic/Logs/game-*.log`.
 
-### 4. Build the tile pyramid + run the viewer
+### 4. Build + run
 
 ```bash
 bash tools/serve.sh
 ```
 
-This installs deps, **builds the tile pyramid** (`tools/build-tiles.mjs` — composites the full map once and slices it into ~21k tiles, ~1–2 min), and starts the dev server. Open **http://localhost:8080**.
+This installs deps, renders the tile pyramid, and starts the dev server. Open **http://localhost:8080**.
 
-`serve.sh` only rebuilds the pyramid when your `cells.json` is newer than the last build, so subsequent runs are instant until you export new data. You can force a rebuild anytime with `bun tools/build-tiles.mjs`.
+`serve.sh` only rebuilds the pyramid when `cells.json` is newer than the last build, so subsequent runs are instant until you export new data. Force a rebuild anytime with:
 
-> **Tile detail:** the pyramid renders at 256 px per cell by default. Pass `--ppc 128` for a smaller/faster build (less detail), or higher for more. POIs (stations, warehouses, hideout, …) are baked into the map at full fidelity.
+```bash
+bun tools/build-tiles.mjs [path/to/cells.json] [--ppc 256]
+```
 
 ---
 
 ## Using the map
 
-- **Pan / zoom** — instant. Full detail at every zoom level.
-- **Click a cell** — inspect its coordinates, terrain type, tile ID, rotation, and POI. The cell coords map directly to the in-game `/cell x,y,z` chat command.
-- **Markers** — the “Selected” tab has an **Add marker here** form (label + color). Markers are saved to your browser (`localStorage`) and listed under the **Markers** tab (click to fly, edit, delete).
-- **POIs** — toggle POI name labels from the “Selected” tab; the POI imagery itself is part of the rendered map. The **POIs** tab lists every point of interest on your world.
+| Action | How |
+|---|---|
+| **Pan / zoom** | Drag / scroll. Instant at every zoom level. |
+| **Inspect a cell** | Click it → see type, tile ID, rotation, POI in the sidebar. |
+| **Add a marker** | Click a cell → *Selected* tab → name it, pick a color, **Add marker**. |
+| **Manage markers** | *Markers* tab → click to fly, edit the label, or delete. Saved to `localStorage`. |
+| **Browse POIs** | *POIs* tab lists every point of interest; toggle labels on the map from the *Selected* tab. |
+
+> The cell coordinates shown on click match the in-game `/cell x y z` command, so you can navigate straight to a spot.
 
 ---
 
 ## How it works
 
-**Export (0.6.6+ workaround):** Scrap Mechanic 0.6.6 blocked `sm.json.save` to arbitrary paths (`'$SURVIVAL_DATA/cells.json' is not located in the same content id as the caller`). The export block instead serializes cells with `sm.json.writeJsonString()` and `sm.log.info()`s them to the game log between `START COPYING` / `STOP COPYING` markers; `extract_cells.py` strips the log-line prefixes and parses the JSON.
+**Export — the 0.6.6+ workaround.** Scrap Mechanic 0.6.6 blocked `sm.json.save` to arbitrary paths (`'$SURVIVAL_DATA/cells.json' is not located in the same content id as the caller`). The export block instead serializes cells with `sm.json.writeJsonString()` and writes them to the game log via `sm.log.info()`, between `START COPYING` / `STOP COPYING` markers. `extract_cells.py` finds the markers, strips the log-line prefixes, and parses the JSON.
 
-**Pre-render (`build-tiles.mjs`):** builds a 1-px-per-cell terrain-color base, nearest-neighbor upscales it to full resolution (256 px/cell), composites every cell's rotated tile image + road segments + POI overlays in a **single Sharp pass**, then downsamples and slices the result into a standard Leaflet `{z}/{x}/{y}.webp` pyramid. North is up.
+**Pre-render — `build-tiles.mjs`.** Builds a 1-px-per-cell terrain-color base, nearest-neighbor upscales it to full resolution (256 px/cell by default), then composites every cell's rotated tile image, road segments, and POI overlays in a **single Sharp pass**. The result is downsampled per zoom level and sliced into a standard Leaflet `{z}/{x}/{y}.webp` pyramid. North is up.
 
-**Viewer:** React + Vite + TypeScript. Vanilla Leaflet with `L.CRS.Simple` displays the pre-rendered pyramid via `L.tileLayer`; cell ↔ lat/lng conversion is derived from the pyramid geometry. Markers persist in `localStorage`.
+**Viewer.** React 18 + Vite + TypeScript. Vanilla Leaflet with `L.CRS.Simple` displays the pre-rendered pyramid via `L.tileLayer`; cell ↔ lat/lng is derived from the pyramid geometry. Markers persist in `localStorage`.
+
+---
+
+## Project layout
+
+```
+scrap-mechanic-overview/
+├── game-patches/
+│   ├── tile_database.lua      # replace game's overworld/tile_database.lua
+│   └── export_block.lua       # paste into game's terrain_overworld.lua
+├── tools/
+│   ├── extract_cells.py       # game log → viewer/public/data/cells.json
+│   ├── build-tiles.mjs        # cells.json + img → tile pyramid (Sharp)
+│   └── serve.sh               # one command: deps + build(if needed) + dev server
+├── viewer/                    # React + Vite + TS + Leaflet app
+│   ├── public/img/            # terrain tile + POI source images
+│   ├── public/data/cells.json # sample data (yours overwrites this)
+│   ├── public/tiles/          # generated pyramid (gitignored)
+│   └── src/
+└── legacy/                    # the original vanilla viewer, kept for reference
+```
+
+---
+
+## Troubleshooting
+
+<details>
+<summary><b>Some cells are flat color, not textured</b></summary>
+
+This is **expected** and matches upstream. Only ~300 specific tile variants have hand-authored images; the rest render as flat biome colors. A typical world is 73% lake (which is color-only), so large blue areas are normal. DESERT, AUTUMNFOREST, and FIELD biomes are fully textured.
+</details>
+
+<details>
+<summary><b>Map shows "Couldn't load the map" / blank after a rebuild</b></summary>
+
+If you rebuild tiles while the dev server is running and get `Unexpected token '<'`, the dev server has a stale handle on the `tiles/` directory. Restart it:
+
+```bash
+systemctl --user restart sm_overview_react.service   # if running via systemd
+# or just Ctrl+C and re-run: bash tools/serve.sh
+```
+
+(The builder now preserves the directory inode, so this shouldn't recur — but a restart always fixes it.)
+</details>
+
+<details>
+<summary><b>Tiles look soft at maximum zoom</b></summary>
+
+Rebuild at higher resolution: `bun tools/build-tiles.mjs --ppc 512`. Costs more build time and RAM, gains crispness at deep zoom.
+</details>
+
+<details>
+<summary><b>Export wrote nothing to the log</b></summary>
+
+The block runs once per session. If you've already loaded the save in this session, fully quit and relaunch the game, then load the save again. Check the game log for `START COPYING` / `STOP COPYING` markers.
+</details>
 
 ---
 
 ## Credits & license
 
-Derivative of [**sm_overview**](https://github.com/the1killer/sm_overview) by **The1Killer**, including: the cell/POI/road parsing logic, the full tile + POI image set (`viewer/public/img/`), the `tile_database.lua` modification (by **Arkanorian**, adds `GetLegacyID`), and the cell-export concept. The original vanilla viewer is preserved in [`legacy/`](legacy) for reference.
+Derivative of [**sm_overview**](https://github.com/the1killer/sm_overview) by **The1Killer**, including: the cell/POI/road parsing logic, the full tile and POI image set (`viewer/public/img/`), the `tile_database.lua` modification (by **Arkanorian**, adds `GetLegacyID`), and the cell-export concept. The original vanilla viewer is preserved in [`legacy/`](legacy) for reference.
 
-**Added here:** the 0.6.6+ log-based export block (with `pcall` error handling), the automated `extract_cells.py` log parser, the Sharp **pre-render tile-pyramid builder**, and the **React/Leaflet viewer** with persistent markers.
+**Added here:** the 0.6.6+ log-based export block (with `pcall` error handling), the automated `extract_cells.py` log parser, the Sharp pre-render tile-pyramid builder, and the React/Leaflet viewer with persistent markers.
 
-Released under [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/) — same license as upstream (see [LICENSE](LICENSE)): free for non-commercial use with attribution; derivatives must use the same license.
+Released under [**CC BY-NC-SA 4.0**](https://creativecommons.org/licenses/by-nc-sa/4.0/) — the same license as upstream (see [LICENSE](LICENSE)): free for non-commercial use with attribution; derivatives must use the same license.
 
 *Scrap Mechanic is property of Axolot Games AB. This project is unaffiliated.*
