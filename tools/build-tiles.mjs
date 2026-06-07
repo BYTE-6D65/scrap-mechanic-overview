@@ -65,7 +65,7 @@ const START = {
 };
 function tileImg(id, x, y){
   const st = START[`${x},${y}`];
-  if (st) return join(TILES_SRC, st);
+  if (st) return join(IMG_DIR, st);     // start_crashsite_-3x_-4x live in img/ root, not img/tiles/
   if (validTiles.has(id)) return join(TILES_SRC, `${id}.jpg`);
   return null;
 }
@@ -220,7 +220,7 @@ async function main(){
     for (let ix = 0; ix < S; ix++) for (let iy = 0; iy < S; iy++) found.add(`${c.x+ix},${c.y+iy}`);
     if (!url || !existsSync(url)) continue;
     const left = (c.x - b.xMin) * PPC;
-    const top = (b.yMax - (c.y + S)) * PPC;
+    const top = py(c.y + S - 1);          // north edge of cell (y+S-1); anchor (x,y) is the SW corner
     const deg = ROT[c.rotation] ?? 0;
     const buf = await sharp(url).rotate(deg).resize(S*PPC, S*PPC, { fit:"fill" }).toBuffer();
     layers.push({ input: buf, left, top });
