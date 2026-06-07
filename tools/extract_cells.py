@@ -30,7 +30,7 @@ STOP = "STOP COPYING BEFORE THIS LINE FOR CELLS.JSON"
 PREFIX = re.compile(r"^\d{2}:\d{2}:\d{2} \([\d/]+\) \[[^\]]*\] ?")
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_OUT = os.path.join(REPO_ROOT, "viewer", "assets", "json", "cells.json")
+DEFAULT_OUT = os.path.join(REPO_ROOT, "viewer", "public", "data", "cells.json")
 
 
 def candidate_log_dirs():
@@ -140,7 +140,9 @@ def main():
     print(f"  seed:     {first.get('seed')}")
     print(f"  bounds x: [{bounds.get('xMin')}, {bounds.get('xMax')}]")
     print(f"  bounds y: [{bounds.get('yMin')}, {bounds.get('yMax')}]")
-    print("\nNow run:  bash tools/serve.sh   and open http://localhost:8080")
+    print("\nNext: rebuild tiles + view the map:")
+    print("  bun tools/build-tiles.mjs   # regenerate the tile pyramid from this data")
+    print("  bash tools/serve.sh         # then open http://localhost:8080")
 
 
 if __name__ == "__main__":

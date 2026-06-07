@@ -1,0 +1,13 @@
+{
+  "name": "scrap-mechanic-overview",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Export your Scrap Mechanic Survival world to an interactive map.",
+  "license": "CC-BY-NC-SA-4.0",
+  "scripts": {
+    "build-tiles": "bun tools/build-tiles.mjs"
+  },
+  "dependencies": {
+    "sharp": "^0.34.5"
+  }
+}
