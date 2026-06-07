@@ -1,0 +1,17 @@
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Python
+__pycache__/
+*.pyc
+
+# Local viewer logs / scratch
+viewer.log
+*.cells.raw.txt
+
+# NOTE: a sample viewer/assets/json/cells.json is committed on purpose so the
+# viewer works out of the box. `tools/extract_cells.py` overwrites it with your
+# real world data; do NOT commit your own cells.json if your seed is private.
